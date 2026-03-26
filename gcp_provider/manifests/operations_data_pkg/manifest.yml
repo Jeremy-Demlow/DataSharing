@@ -1,0 +1,23 @@
+roles:
+  - app_user:
+      comment: "Read-only access to shared operations data"
+  - app_admin:
+      comment: "Full access to all shared operations objects"
+
+shared_content:
+  databases:
+    - SHARED_OPERATIONS_DATA:
+        schemas:
+          - CORE:
+              roles: [app_user, app_admin]
+              tables:
+                - CUSTOMERS:
+                    roles: [app_user, app_admin]
+                - ORDERS:
+                    roles: [app_user, app_admin]
+                - PRODUCTS:
+                    roles: [app_user, app_admin]
+                - SUPPORT_TICKETS:
+                    roles: [app_user, app_admin]
+                - USAGE_METRICS:
+                    roles: [app_user, app_admin]

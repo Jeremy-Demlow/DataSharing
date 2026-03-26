@@ -1,0 +1,29 @@
+# ~/.snowflake/connections.toml
+# Copy this to ~/.snowflake/connections.toml and fill in your values
+#
+# Key generation:
+#   openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out ~/.snowflake/keys/<name>.p8 -nocrypt
+
+[default]
+account = "<YOUR_AWS_ACCOUNT_LOCATOR>"
+user = "<YOUR_USER>"
+role = "ACCOUNTADMIN"
+warehouse = "COMPUTE_WH"
+authenticator = "SNOWFLAKE_JWT"
+private_key_path = "~/.snowflake/keys/snowflake_tf_key.p8"
+
+[gcp_central]
+account = "<YOUR_GCP_ACCOUNT_LOCATOR>"
+user = "JD_SERVICE_ACCOUNT_ADMIN"
+role = "BLACKLINE_DEVELOPER"
+warehouse = "SHARING_WH"
+authenticator = "SNOWFLAKE_JWT"
+private_key_path = "~/.snowflake/keys/gcp_central_key.p8"
+
+[azure_central]
+account = "<YOUR_AZURE_ACCOUNT_LOCATOR>"
+user = "JD_SERVICE_ACCOUNT_ADMIN"
+role = "ACCOUNTADMIN"
+warehouse = "COMPUTE_WH"
+authenticator = "SNOWFLAKE_JWT"
+private_key_path = "~/.snowflake/keys/azure_central_key.p8"

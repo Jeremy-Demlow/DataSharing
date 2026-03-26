@@ -1,0 +1,36 @@
+# Snowflake connection config (contains account details and key paths)
+.snowflake/
+
+# Service user SQL with real RSA keys (use .example versions instead)
+setup/01_gcp_service_user.sql
+setup/02_azure_service_user.sql
+
+# Private keys
+*.p8
+*.pem
+*.key
+
+# Generated artifacts (rebuild with: python3 build_presentation.py)
+*.pptx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+/tmp/
+*.tmp
+*.log

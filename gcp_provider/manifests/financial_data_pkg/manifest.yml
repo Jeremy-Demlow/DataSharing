@@ -1,0 +1,23 @@
+roles:
+  - app_user:
+      comment: "Read-only access to shared financial data"
+  - app_admin:
+      comment: "Full access to all shared financial objects"
+
+shared_content:
+  databases:
+    - SHARED_FINANCIAL_DATA:
+        schemas:
+          - CORE:
+              roles: [app_user, app_admin]
+              tables:
+                - JOURNAL_ENTRIES:
+                    roles: [app_user, app_admin]
+                - ACCOUNT_BALANCES:
+                    roles: [app_user, app_admin]
+                - RECONCILIATIONS:
+                    roles: [app_user, app_admin]
+                - CLOSE_TASKS:
+                    roles: [app_user, app_admin]
+                - INTERCOMPANY_TRANSACTIONS:
+                    roles: [app_user, app_admin]

@@ -1,0 +1,46 @@
+-- ============================================================================
+-- 01_gcp_service_user.sql
+-- Run on: <YOUR_ORG>-<GCP_ACCOUNT_NAME>
+-- Logged in as: <YOUR_ADMIN_USER> (ACCOUNTADMIN) via Snowsight or externalbrowser
+-- Purpose: Create service user with RSA key-pair auth for automation
+--
+-- Instructions:
+--   1. Generate an RSA key pair:
+--      openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out gcp_central_key.p8 -nocrypt
+--      openssl rsa -in gcp_central_key.p8 -pubout -out gcp_central_key.pub
+--   2. Copy the public key (without headers) into RSA_PUBLIC_KEY below
+--   3. Store the private key in ~/.snowflake/keys/gcp_central_key.p8
+-- ============================================================================
+
+USE ROLE ACCOUNTADMIN;
+
+-- ============================================================================
+-- STEP 1: Create the service user (TYPE=SERVICE, RSA key-pair only)
+-- ============================================================================
+
+CREATE USER IF NOT EXISTS JD_SERVICE_ACCOUNT_ADMIN
+    TYPE = SERVICE
+    RSA_PUBLIC_KEY = '<PASTE_YOUR_RSA_PUBLIC_KEY_HERE>'
+    COMMENT = 'Service account for Cortex Code / data sharing automation';
+
+-- ============================================================================
+-- STEP 2: Grant roles to the service user
+-- ============================================================================
+
+GRANT ROLE ACCOUNTADMIN TO USER JD_SERVICE_ACCOUNT_ADMIN;
+GRANT ROLE SYSADMIN TO USER JD_SERVICE_ACCOUNT_ADMIN;
+
+-- ============================================================================
+-- STEP 3: Set default role
+-- Note: DATA_SHARING_ADMIN is set as default AFTER 00_provider_rbac_setup.sql
+-- creates it. For initial setup, ACCOUNTADMIN is the safe default.
+-- ============================================================================
+
+ALTER USER JD_SERVICE_ACCOUNT_ADMIN SET DEFAULT_ROLE = 'ACCOUNTADMIN';
+
+-- ============================================================================
+-- STEP 4: Verify
+-- ============================================================================
+
+DESCRIBE USER JD_SERVICE_ACCOUNT_ADMIN;
+SHOW GRANTS TO USER JD_SERVICE_ACCOUNT_ADMIN;

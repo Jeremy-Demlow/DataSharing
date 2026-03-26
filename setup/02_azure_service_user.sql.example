@@ -1,0 +1,26 @@
+------------------------------------------------------------------------
+-- RUN THIS ON: <YOUR_ORG>-<AZURE_ACCOUNT_NAME>
+-- LOGGED IN AS: <YOUR_ADMIN_USER> (ACCOUNTADMIN)
+-- PURPOSE: Create service user with RSA key-pair auth for automation
+--
+-- Instructions:
+--   1. Generate an RSA key pair:
+--      openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out azure_central_key.p8 -nocrypt
+--      openssl rsa -in azure_central_key.p8 -pubout -out azure_central_key.pub
+--   2. Copy the public key (without headers) into RSA_PUBLIC_KEY below
+--   3. Store the private key in ~/.snowflake/keys/azure_central_key.p8
+------------------------------------------------------------------------
+
+USE ROLE SECURITYADMIN;
+
+CREATE USER IF NOT EXISTS JD_SERVICE_ACCOUNT_ADMIN
+    TYPE = SERVICE
+    RSA_PUBLIC_KEY = '<PASTE_YOUR_RSA_PUBLIC_KEY_HERE>'
+    DEFAULT_ROLE = ACCOUNTADMIN
+    COMMENT = 'Service account for Cortex Code / data sharing automation';
+
+GRANT ROLE ACCOUNTADMIN TO USER JD_SERVICE_ACCOUNT_ADMIN;
+GRANT ROLE SYSADMIN TO USER JD_SERVICE_ACCOUNT_ADMIN;
+
+-- Verify
+DESCRIBE USER JD_SERVICE_ACCOUNT_ADMIN;
