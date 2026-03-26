@@ -193,6 +193,85 @@ GCP Account: <GCP_ACCOUNT_NAME>
 
 ---
 
+## Data Refresh Pipeline
+
+After the initial replication, the provider can push data changes to consumers:
+
+```
+ PROVIDER (GCP)                     SNOWFLAKE                        CONSUMER (Azure)
+ ═══════════════                    ═══════════                      ════════════════
+
+ Normal Operations:
+ ──────────────────
+
+ ┌──────────────────┐
+ │ ETL / INSERT /   │
+ │ UPDATE / DELETE   │
+ │ on source tables │
+ └────────┬─────────┘
+          │
+          ├─── OPTION A: Wait for scheduled refresh ──────────────────────────┐
+          │    (default: every 1440 MINUTE / 24 hours)                        │
+          │    Parameter: LISTING_AUTO_FULFILLMENT_REPLICATION_               │
+          │               REFRESH_SCHEDULE                                    │
+          │                                                                    │
+          └─── OPTION B: Trigger immediate refresh ───┐                       │
+               (recommended after data loads)          │                       │
+                                                       │                       │
+ ┌──────────────────┐                                  │                       │
+ │ USE ROLE         │                                  │                       │
+ │   ACCOUNTADMIN;  │                                  │                       │
+ │ SELECT SYSTEM$   │──────────────────────────────────┘                       │
+ │   TRIGGER_       │                                                          │
+ │   LISTING_       │         ┌───────────────────┐                            │
+ │   REFRESH(       │────────>│ Auto-Fulfillment  │                            │
+ │   'DATABASE',    │         │ Engine            │<───────────────────────────┘
+ │   '<db_name>');  │         │                   │
+ └──────────────────┘         │ Determines delta  │
+                              │ (incremental vs   │
+                              │  full refresh)    │
+                              └─────────┬─────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │ Cross-Cloud        │
+                              │ Replication        │
+                              │                    │
+                              │ Initial: 30-90 min │
+                              │ Incremental: ~30s  │
+                              └─────────┬──────────┘
+                                        │
+                                        ▼
+                              ┌───────────────────┐       ┌──────────────────┐
+                              │ Secure Share Area  │──────>│ Consumer sees    │
+                              │ updated in remote  │       │ new/changed rows │
+                              │ region(s)          │       │ automatically    │
+                              └───────────────────┘       └──────────────────┘
+
+ Key Functions:
+ ──────────────
+ SYSTEM$TRIGGER_LISTING_REFRESH('DATABASE', '<db_name>')
+   - Triggers immediate replication of the named database
+   - Returns: "Successfully triggered refresh for DATABASE '<db_name>' in N region(s)."
+   - Requires: ACCOUNTADMIN or MANAGE LISTING AUTO FULFILLMENT privilege
+
+ SHOW PARAMETERS LIKE 'LISTING_AUTO_FULFILLMENT%' IN ACCOUNT;
+   - Shows current scheduled refresh interval
+   - Default: 1440 MINUTE (24 hours)
+
+ Timing Expectations:
+ ────────────────────
+ ┌────────────────────────┬─────────────────────────────────────────┐
+ │ Scenario               │ Expected Duration                       │
+ ├────────────────────────┼─────────────────────────────────────────┤
+ │ Initial replication    │ 30-90 minutes (full data + metadata)   │
+ │ Incremental (small)    │ ~30 seconds (few rows changed)         │
+ │ Incremental (large)    │ Minutes (depends on change volume)     │
+ │ Schema changes         │ May require new LIVE VERSION release   │
+ └────────────────────────┴─────────────────────────────────────────┘
+```
+
+---
+
 ## Script Execution Order
 
 ```
@@ -278,6 +357,17 @@ GCP Account: <GCP_ACCOUNT_NAME>
                 │   '<AWS_LISTING_GLOBAL_NAME>'            │             │   '<AZURE_LISTING_GLOBAL_NAME>'              │
                 │ Query + verify data        │             │ Query + verify data          │
                 └────────────────────────────┘             └──────────────────────────────┘
+                              │                                               │
+                              └───────────────────────┬───────────────────────┘
+                                                      │
+                                   ┌──────────────────▼───────────────────┐
+                                   │ gcp_provider/05_data_refresh_        │
+                                   │   test.sql                           │
+                                   │ ──────────────────────               │
+                                   │ INSERT test data into shared DBs     │
+                                   │ SYSTEM$TRIGGER_LISTING_REFRESH       │
+                                   │ Verify on consumer (~30 sec)         │
+                                   └──────────────────────────────────────┘
 ```
 
 ---

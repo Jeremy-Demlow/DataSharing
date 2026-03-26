@@ -147,6 +147,86 @@ snow sql -c myconnection -f aws_consumer/01_install_app.sql
 snow sql -c azure_central -f azure_consumer/01_install_app.sql
 ```
 
+### Data Refresh Test (verify ongoing data pipeline)
+
+```bash
+# 1. Insert new data + trigger on-demand refresh on GCP provider
+snow sql -c gcp_central -f gcp_provider/05_data_refresh_test.sql
+
+# 2. Wait ~30 seconds, then verify on Azure consumer
+snow sql -c azure_central -q "USE WAREHOUSE COMPUTE_WH; \
+  SELECT NAME, INDUSTRY, ARR, CREATED_DATE \
+  FROM SHARED_OPERATIONS_DATA.CORE.CUSTOMERS \
+  WHERE NAME = 'PIPELINE_VERIFY_2026';"
+```
+
+---
+
+## Data Refresh & Auto-Fulfillment
+
+After the initial setup, data changes on the provider are replicated to consumers
+via Snowflake's auto-fulfillment engine. There are two refresh modes:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                      DATA REFRESH MODES                                        │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                │
+│  1. SCHEDULED (default)                                                        │
+│     ├── Account parameter: LISTING_AUTO_FULFILLMENT_REPLICATION_REFRESH_...   │
+│     ├── Default interval: 1440 MINUTE (24 hours)                              │
+│     ├── Applies to ALL app packages from this account                         │
+│     └── Change: ALTER ACCOUNT SET LISTING_AUTO_FULFILLMENT_...                │
+│                 = '60 MINUTE';                                                │
+│                                                                                │
+│  2. ON-DEMAND (trigger-based)                                                  │
+│     ├── Function: SYSTEM$TRIGGER_LISTING_REFRESH('DATABASE', '<db_name>')     │
+│     ├── Use after: ETL completes, data load finishes, urgent update           │
+│     ├── Requires: ACCOUNTADMIN or MANAGE LISTING AUTO FULFILLMENT privilege   │
+│     └── Incremental changes replicate in ~30 seconds                          │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Refresh Flow
+
+```
+ PROVIDER (GCP)                     SNOWFLAKE                        CONSUMER (Azure)
+ ═══════════════                    ═══════════                      ════════════════
+
+ ┌──────────────────┐
+ │ INSERT INTO      │
+ │ SHARED_OPERATIONS│
+ │ _DATA.CORE.*     │
+ └────────┬─────────┘
+          │
+          ▼
+ ┌──────────────────┐         ┌───────────────────┐
+ │ SYSTEM$TRIGGER_  │────────>│ Auto-Fulfillment  │
+ │ LISTING_REFRESH  │         │ Engine            │
+ │ ('DATABASE',     │         │                   │
+ │  'SHARED_OPS_...')│         │ Incremental       │
+ └──────────────────┘         │ replication       │
+                              │ (~30 sec)         │
+                              └─────────┬─────────┘
+                                        │
+                                        ▼
+                              ┌───────────────────┐       ┌──────────────────┐
+                              │ Secure Share Area  │──────>│ Consumer queries  │
+                              │ (SSA) in Azure     │       │ see new rows     │
+                              │ region             │       │ immediately      │
+                              └───────────────────┘       └──────────────────┘
+```
+
+### Verified Test Results (March 26, 2026)
+
+| Step | Action | Result |
+|---|---|---|
+| 1 | Insert `PIPELINE_VERIFY_2026` on GCP provider | GCP: 17 customers, 19 orders, 32 metrics |
+| 2 | `SYSTEM$TRIGGER_LISTING_REFRESH('DATABASE', 'SHARED_OPERATIONS_DATA')` | "Successfully triggered refresh...in 1 region(s)." |
+| 3 | Query Azure consumer ~30 seconds later | Azure: 17 customers, 19 orders, 32 metrics |
+| 4 | Verify specific row on Azure | `PIPELINE_VERIFY_2026` present with all fields intact |
+
 ---
 
 ## Project Structure
@@ -164,6 +244,7 @@ DataSharing/
 │   ├── 02_create_app_package_aws.sql             # FINANCIAL_DATA_PKG (TYPE=DATA)
 │   ├── 03_create_app_package_azure.sql           # OPERATIONS_DATA_PKG (TYPE=DATA)
 │   ├── 04_create_listings.sql                    # Private listings + publish
+│   ├── 05_data_refresh_test.sql                  # End-to-end refresh pipeline test
 │   └── manifests/
 │       ├── financial_data_pkg/manifest.yml       # Roles & shared objects definition
 │       └── operations_data_pkg/manifest.yml
@@ -184,13 +265,13 @@ DataSharing/
 ## Execution Flow
 
 ```
- ┌─────────┐   ┌─────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
- │ Step 0  │──>│ Step 1  │──>│ Step 2   │──>│ Step 3   │──>│ Step 4   │──>│ Step 5   │
- │ Org     │   │ RBAC    │   │ Source   │   │ App      │   │ Listings │   │ Consumer │
- │ Setup   │   │ Setup   │   │ Data     │   │ Packages │   │ Publish  │   │ Install  │
- └─────────┘   └─────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
-  ORGADMIN      ACCOUNTADMIN   DATA_SHARING   DATA_SHARING   ACCOUNTADMIN   ACCOUNTADMIN
-  (once)        + custom role  _ADMIN          _ADMIN                       (consumer)
+ ┌─────────┐   ┌─────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+ │ Step 0  │──>│ Step 1  │──>│ Step 2   │──>│ Step 3   │──>│ Step 4   │──>│ Step 5   │──>│ Step 6   │
+ │ Org     │   │ RBAC    │   │ Source   │   │ App      │   │ Listings │   │ Consumer │   │ Refresh  │
+ │ Setup   │   │ Setup   │   │ Data     │   │ Packages │   │ Publish  │   │ Install  │   │ Test     │
+ └─────────┘   └─────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
+  ORGADMIN      ACCOUNTADMIN   DATA_SHARING   DATA_SHARING   ACCOUNTADMIN   ACCOUNTADMIN   DATA_SHARING
+  (once)        + custom role  _ADMIN          _ADMIN                       (consumer)     _ADMIN
 ```
 
 ---
@@ -247,6 +328,8 @@ DataSharing/
 7. **Connection management**: `snowflake_sql_execute` tool does NOT switch connections. Always use `snow sql -c <connection>` CLI for multi-account workflows.
 
 8. **Grant syntax**: `MANAGE LISTING AUTO FULFILLMENT ON ACCOUNT` — no account name after `ACCOUNT`. It always refers to the current account.
+
+9. **Data refresh timing**: On-demand `SYSTEM$TRIGGER_LISTING_REFRESH` propagates incremental changes in ~30 seconds. Default scheduled refresh is 24 hours (`1440 MINUTE`). Always trigger on-demand after data loads for near-real-time sync.
 
 ---
 
