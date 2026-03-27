@@ -102,7 +102,7 @@ add_text_box(slide, Inches(1), Inches(3.2), Inches(11), Inches(1),
 add_shape(slide, Inches(4.5), Inches(4.5), Inches(4.3), Inches(0.04), SNOW_BLUE, shape_type=MSO_SHAPE.RECTANGLE)
 
 add_text_box(slide, Inches(1), Inches(5.0), Inches(11), Inches(0.6),
-    "BlackLine  |  Snowflake Solution Engineering",
+    "ACME_COMPANY  |  Snowflake Solution Engineering",
     font_size=20, font_color=WHITE, bold=False, align=PP_ALIGN.CENTER)
 
 add_text_box(slide, Inches(1), Inches(5.6), Inches(11), Inches(0.6),
@@ -645,7 +645,7 @@ add_text_box(slide, Inches(1), Inches(2.0), Inches(11), Inches(1.5),
 add_shape(slide, Inches(4.5), Inches(3.7), Inches(4.3), Inches(0.04), SNOW_BLUE, shape_type=MSO_SHAPE.RECTANGLE)
 
 add_text_box(slide, Inches(1), Inches(4.2), Inches(11), Inches(1),
-    "Cross-Cloud Declarative Data Sharing  |  BlackLine + Snowflake",
+    "Cross-Cloud Declarative Data Sharing  |  ACME_COMPANY + Snowflake",
     font_size=22, font_color=SNOW_BLUE, bold=False, align=PP_ALIGN.CENTER)
 
 add_text_box(slide, Inches(1), Inches(5.2), Inches(11), Inches(0.6),

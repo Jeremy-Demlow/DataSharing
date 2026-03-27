@@ -1,6 +1,6 @@
 # Cross-Cloud Declarative Data Sharing
 
-**BlackLine + Snowflake | March 2026**
+**Snowflake | March 2026**
 
 100% SQL-based, programmatic cross-cloud data sharing using Snowflake's Declarative Sharing (`TYPE=DATA` application packages). No UI clicks, no Terraform, no ETL pipelines.
 
